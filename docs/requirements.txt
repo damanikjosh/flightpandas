@@ -1,0 +1,7 @@
+sphinx-rtd-theme
+pytest
+geopandas
+shapely
+pandas
+pyarrow
+cartopy

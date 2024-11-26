@@ -1,5 +1,7 @@
 # FlightPandas
 
+> **Notice**: This library is still under heavy development. Features and APIs may change.
+
 FlightPandas is a Python library for processing, analyzing, and visualizing flight trajectory data using Pandas and GeoPandas. It provides an intuitive interface for working with individual flights, grouped flight data, and time series operations.
 
 
@@ -113,6 +115,7 @@ The library is structured as follows:
 ### **Methods**
 - **Resample and Interpolate**: Handle time-series data with methods like `.resample(freq)`.
 
+You can find the full documentation [here](https://flightpandas.readthedocs.io/en/latest/index.html).
 
 ## **Dependencies**
 
