@@ -1,0 +1,6 @@
+pytest
+geopandas
+shapely
+pandas
+pyarrow
+cartopy
