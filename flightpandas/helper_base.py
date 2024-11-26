@@ -1,22 +1,73 @@
+"""
+helper_base.py
+
+This module defines the `HelperBase` class, which serves as a foundational base for operations on 
+`Flight` and `FlightCollection` objects. The `HelperBase` class is compatible with pandas-style 
+method chaining through the `pipe` method, enabling flexible and reusable transformations.
+
+Classes:
+--------
+HelperBase:
+    A base class for creating operations on `Flight` and `FlightCollection` objects, 
+    supporting sequential pipelines for data processing and transformations.
+
+Examples:
+---------
+# Create a HelperBase instance
+helper = HelperBase(flight)
+
+# Add transformations to the pipeline
+helper = helper.pipe(transformation_func_1).pipe(transformation_func_2)
+
+# Evaluate the pipeline
+result = helper.eval()
+"""
 from flightpandas.flight import Flight
 from flightpandas.flight_collection import FlightCollection
 
 class HelperBase:
     """
-    Base class for operations on Flight and FlightCollection objects, compatible
-    with the pandas `pipe` method for chaining operations.
+    A base class for operations on `Flight` and `FlightCollection` objects, enabling method 
+    chaining and reusable transformation pipelines.
 
     Attributes:
-        data (Flight | FlightCollection): The data object to operate on.
-        pipes (list): A list of applied operations for tracking the pipeline.
+    -----------
+    data : Flight | FlightCollection
+        The data object (`Flight` or `FlightCollection`) to operate on.
+    pipes : list
+        A list of applied operations for tracking the transformation pipeline.
+
+    Methods:
+    --------
+    __init__(obj, *args, **kwargs):
+        Initializes the HelperBase with a data object and tracks the transformation pipeline.
+    eval(*args, **kwargs):
+        Evaluates all the transformations in the pipeline sequentially and applies them to the data object.
+    pipe(func, *args, **kwargs):
+        Adds a transformation function to the pipeline and returns the updated HelperBase.
+    _eval_flight(obj, *args, **kwargs):
+        Processes a single `Flight` object and applies custom transformations.
+    _eval_flight_collection(obj, *args, **kwargs):
+        Processes a `FlightCollection` object and applies custom transformations.
     """
 
     def __init__(self, obj, *args, **kwargs):
         """
-        Initializes the HelperBase with a Flight or FlightCollection object.
-        
-        Args:
-            obj (Flight | FlightCollection): The input data object.
+        Initializes the HelperBase with a `Flight` or `FlightCollection` object.
+
+        Parameters:
+        -----------
+        obj : Flight | FlightCollection
+            The input data object to be processed.
+        *args : tuple
+            Additional positional arguments for initialization.
+        **kwargs : dict
+            Additional keyword arguments for initialization.
+
+        Raises:
+        -------
+        ValueError:
+            If the input object is not a `Flight` or `FlightCollection` instance.
         """
         if isinstance(obj, HelperBase):
             self.pipes = obj.pipes
@@ -31,18 +82,29 @@ class HelperBase:
 
     def eval(self, *args, **kwargs) -> Flight | FlightCollection:
         """
-        Applies all the transformations in the pipeline sequentially.
+        Evaluates all the transformations in the pipeline sequentially.
 
-        Each pipe in `self.pipes` is applied to the current data object.
-        The transformations are delegated to either `_eval_flight` or
-        `_eval_flight_collection` depending on the type of the current data.
+        Each transformation in `self.pipes` is applied to the data object. Depending on the data type,
+        the transformation is delegated to `_eval_flight` or `_eval_flight_collection`.
 
-        Args:
-            *args: Positional arguments for the pipeline functions.
-            **kwargs: Keyword arguments for the pipeline functions.
+        Parameters:
+        -----------
+        *args : tuple
+            Additional positional arguments for pipeline functions.
+        **kwargs : dict
+            Additional keyword arguments for pipeline functions.
 
         Returns:
-            FlightCollection: The final result after applying all transformations.
+        --------
+        Flight | FlightCollection:
+            The result after applying all transformations in the pipeline.
+
+        Raises:
+        -------
+        TypeError:
+            If a pipe in the pipeline is not an instance of `HelperBase`.
+        ValueError:
+            If the data object has an unexpected type during evaluation.
         """
         data = self.data
 
@@ -67,36 +129,60 @@ class HelperBase:
 
     def pipe(self, func: callable, *args, **kwargs) -> "HelperBase":
         """
-        Applies a function in the pipeline and returns the resulting HelperBase.
+        Adds a function to the transformation pipeline.
 
-        Args:
-            func (callable): The function to apply.
-        
+        Parameters:
+        -----------
+        func : callable
+            The transformation function to apply.
+        *args : tuple
+            Additional positional arguments for the transformation function.
+        **kwargs : dict
+            Additional keyword arguments for the transformation function.
+
         Returns:
-            HelperBase: The resulting object after applying the function.
+        --------
+        HelperBase:
+            The updated `HelperBase` object with the new transformation function added.
         """
         return func(self, *args, **kwargs)
 
     def _eval_flight(self, obj: Flight, *args, **kwargs) -> Flight | FlightCollection:
         """
-        Processes a single Flight object.
+        Processes a single `Flight` object and applies transformations.
 
-        Args:
-            flight (Flight): The Flight object to process.
+        Parameters:
+        -----------
+        obj : Flight
+            The `Flight` object to process.
+        *args : tuple
+            Additional positional arguments for the transformation.
+        **kwargs : dict
+            Additional keyword arguments for the transformation.
 
         Returns:
-            FlightCollection: The resulting FlightCollection.
+        --------
+        Flight | FlightCollection:
+            The processed `Flight` object or resulting collection.
         """
         return obj
 
     def _eval_flight_collection(self, obj: FlightCollection, *args, **kwargs) -> Flight | FlightCollection:
         """
-        Processes a FlightCollection object.
+        Processes a `FlightCollection` object and applies transformations.
 
-        Args:
-            fc (FlightCollection): The FlightCollection object to process.
+        Parameters:
+        -----------
+        obj : FlightCollection
+            The `FlightCollection` object to process.
+        *args : tuple
+            Additional positional arguments for the transformation.
+        **kwargs : dict
+            Additional keyword arguments for the transformation.
 
         Returns:
-            FlightCollection: The processed FlightCollection.
+        --------
+        Flight | FlightCollection:
+            The processed `FlightCollection` object or resulting collection.
         """
         return obj

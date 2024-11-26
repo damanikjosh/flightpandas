@@ -1,3 +1,38 @@
+"""
+flight_collection.py
+
+This module provides the `FlightCollection` class, which represents a grouped collection of flights,
+and related utility classes and methods to manipulate and analyze flight trajectory data.
+
+Classes:
+--------
+- FlightCollection: Extends `DataFrameGroupBy` and provides additional functionality for handling
+  collections of `Flight` objects.
+- _CollectionIndexer: A utility class for indexing `FlightCollection` by group keys or indices.
+
+Functions:
+----------
+- dtw_distance_matrix: Computes the Dynamic Time Warping (DTW) distance matrix for flight trajectories.
+- get_linestring: Aggregates flight data into LineString geometries.
+- resample: Resamples flight trajectories to a specified temporal resolution.
+- set_precision: Sets the precision for geometric data.
+- to_crs: Transforms the coordinate reference system of the flight collection.
+- to_latlon: Converts coordinates to latitude and longitude (EPSG:4326).
+- to_xy: Converts coordinates to projected coordinates (EPSG:3857).
+
+Examples:
+---------
+# Create a FlightCollection instance from a DataFrame
+df = pd.DataFrame(...)
+collection = FlightCollection(df, keys="flight_id", lat="latitude", lon="longitude")
+
+# Access a flight group
+flight = collection.flights["flight_id_1"]
+
+# Compute DTW distance matrix
+dtw_matrix = collection.dtw_distance_matrix()
+"""
+
 from flightpandas.flight import Flight
 from pandas import Series, concat
 from pandas.core.groupby import GroupBy, DataFrameGroupBy
@@ -20,7 +55,30 @@ _KeysArgType = Union[
 ]
 
 class _CollectionIndexer:
+    """
+    A utility class for indexing `FlightCollection` by group keys or indices.
+
+    Attributes:
+    -----------
+    collection : FlightCollection
+        The parent `FlightCollection` object.
+
+    Methods:
+    --------
+    __call__(key):
+        Retrieves a `Flight` object by group key.
+    __getitem__(key):
+        Retrieves a `Flight` object by integer index.
+    """
     def __init__(self, collection):
+        """
+        Initializes the indexer with the parent collection.
+
+        Parameters:
+        -----------
+        collection : FlightCollection
+            The parent `FlightCollection` object.
+        """
         self.collection = collection
 
     def __call__(self, key) -> Flight:
@@ -34,14 +92,59 @@ class _CollectionIndexer:
     
 
 class FlightCollection(DataFrameGroupBy, GroupBy[Flight]):
-    def __init__(
-        self,
-        obj,
-        keys: _KeysArgType | None = None,
-        level: IndexLabel | None = None,
-        time=None, lat=None, lon=None, alt=None, alt_rate=None, velocity=None, heading=None,
-        **kwargs,
-    ):
+    """
+    Represents a grouped collection of `Flight` objects with additional methods for geospatial 
+    and temporal operations.
+
+    Attributes:
+    -----------
+    key_names : list
+        The names of the keys used for grouping the collection.
+    data : Flight
+        The underlying flight data as a `Flight` object.
+
+    Methods:
+    --------
+    __iter__():
+        Iterates over the groups in the collection.
+    dtw_distance_matrix(include_altitude=False, **kwargs):
+        Computes the DTW distance matrix for the collection.
+    get_linestring():
+        Aggregates flight data into LineString geometries.
+    resample(freq='1s', method='linear', **kwargs):
+        Resamples the flight trajectories to a specified temporal resolution.
+    set_precision(precision):
+        Sets the precision for geometric data in the collection.
+    to_crs(crs=None, epsg=None, **kwargs):
+        Transforms the coordinate reference system of the collection.
+    to_latlon():
+        Converts coordinates to latitude and longitude (EPSG:4326).
+    to_xy():
+        Converts coordinates to projected coordinates (EPSG:3857).
+    """
+
+    def __init__(self, obj, keys=None, level=None, time=None, lat=None, lon=None, alt=None, alt_rate=None, velocity=None, heading=None, **kwargs):
+        """
+        Initializes a `FlightCollection` instance.
+
+        Parameters:
+        -----------
+        obj : DataFrame or Flight
+            The data to group into a `FlightCollection`.
+        keys : str, list, Series, or None
+            Keys or columns for grouping.
+        level : int, str, or None
+            Level in the index to use for grouping.
+        time, lat, lon, alt, alt_rate, velocity, heading : str, optional
+            Column names for flight attributes.
+        **kwargs : dict
+            Additional arguments for the constructor.
+
+        Raises:
+        -------
+        ValueError:
+            If neither `keys` nor `level` are provided.
+        """
         if keys is None and level is None:
             raise ValueError("You have to supply one of 'keys' or 'level'")
         
@@ -74,6 +177,14 @@ class FlightCollection(DataFrameGroupBy, GroupBy[Flight]):
 
 
     def __iter__(self) -> Iterator[tuple[Hashable, Flight]]:
+        """
+        Iterates over the groups in the collection.
+
+        Yields:
+        -------
+        tuple[Hashable, Flight]:
+            A tuple containing the group key and the corresponding `Flight` object.
+        """
         return super().__iter__()
 
     def _gotitem(self, key, ndim: int, subset=None):
@@ -107,6 +218,21 @@ class FlightCollection(DataFrameGroupBy, GroupBy[Flight]):
         return _CollectionIndexer(self)
     
     def dtw_distance_matrix(self, include_altitude=False, **kwargs):
+        """
+        Computes the Dynamic Time Warping (DTW) distance matrix for the flight trajectories.
+
+        Parameters:
+        -----------
+        include_altitude : bool, optional
+            If True, includes altitude in the distance calculation. Defaults to False.
+        **kwargs : dict
+            Additional arguments for the DTW calculation.
+
+        Returns:
+        --------
+        np.ndarray:
+            The DTW distance matrix.
+        """
         from dtaidistance import dtw_ndim
 
         print("Stacking series into a list")
@@ -116,6 +242,14 @@ class FlightCollection(DataFrameGroupBy, GroupBy[Flight]):
         return dtw_ndim.distance_matrix_fast(series_list, **kwargs)
         
     def get_linestring(self) -> GeoSeries:
+        """
+        Aggregates flight data into LineString geometries.
+
+        Returns:
+        --------
+        GeoSeries:
+            A GeoSeries of LineString geometries for each flight group.
+        """
         from shapely.geometry import LineString
         def _get_linestring(flight):
             if len(flight) < 2:
@@ -125,6 +259,23 @@ class FlightCollection(DataFrameGroupBy, GroupBy[Flight]):
         return self.aggregate({self.obj._geometry_column_name: _get_linestring})
     
     def resample(self, freq='1s', method='linear', **kwargs):
+        """
+        Resamples the flight trajectories to a specified temporal resolution.
+
+        Parameters:
+        -----------
+        freq : str, optional
+            The resampling frequency (e.g., '1T' for one minute). Defaults to '1s'.
+        method : str, optional
+            The interpolation method. Defaults to 'linear'.
+        **kwargs : dict
+            Additional arguments for interpolation.
+
+        Returns:
+        --------
+        FlightCollection:
+            A new `FlightCollection` instance with resampled trajectories.
+        """
         data = self.data
 
         coordinates = data.get_coordinates().rename(columns={'x': 'lon', 'y': 'lat'})
@@ -154,17 +305,63 @@ class FlightCollection(DataFrameGroupBy, GroupBy[Flight]):
         return resampled
     
     def set_precision(self, precision) -> 'FlightCollection':
+        """
+        Sets the precision for geometric data in the collection.
+
+        Parameters:
+        -----------
+        precision : int
+            The desired precision for coordinates.
+
+        Returns:
+        --------
+        FlightCollection:
+            The updated `FlightCollection` instance.
+        """
         def _set_precision(flight):
             flight[self.obj._geometry_column_name] = flight[self.obj._geometry_column_name].set_precision(precision)
             return flight
         return self.apply(lambda x: _set_precision(x)).groupby(self.key_names)
     
     def to_crs(self, crs=None, epsg=None, **kwargs) -> 'FlightCollection':
+        """
+        Transforms the coordinate reference system of the collection.
+
+        Parameters:
+        -----------
+        crs : dict or str, optional
+            The target CRS in dictionary or WKT format.
+        epsg : int, optional
+            The target CRS as an EPSG code.
+        **kwargs : dict
+            Additional arguments for the transformation.
+
+        Returns:
+        --------
+        FlightCollection:
+            The transformed `FlightCollection`.
+        """
         return self.apply(lambda x: x.to_crs(crs, epsg, **kwargs)).groupby(self.key_names)
     
     def to_latlon(self):
+        """
+        Converts coordinates to latitude and longitude (EPSG:4326).
+
+        Returns:
+        --------
+        FlightCollection:
+            The updated collection in latitude/longitude format.
+        """
         return self.to_crs(epsg=4326)
     
     def to_xy(self):
+        """
+        Converts coordinates to projected coordinates (EPSG:3857).
+
+        Returns:
+        --------
+        FlightCollection:
+            The updated collection in projected coordinate format.
+        """
         return self.to_crs(epsg=3857)
     
